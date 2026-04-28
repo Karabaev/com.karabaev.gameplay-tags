@@ -1,0 +1,14 @@
+{
+    "name": "com.karabaev.gameplay-tags",
+    "rootNamespace": "com.karabaev.gameplayTags",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

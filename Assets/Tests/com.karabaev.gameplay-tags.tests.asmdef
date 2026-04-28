@@ -1,0 +1,24 @@
+{
+    "name": "com.karabaev.gameplay-tags.tests",
+    "rootNamespace": "com.karabaev.gameplayTags.tests",
+    "references": [
+        "com.karabaev.gameplay-tags",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

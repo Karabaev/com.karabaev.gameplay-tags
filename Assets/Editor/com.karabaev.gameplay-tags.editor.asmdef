@@ -1,0 +1,19 @@
+{
+    "name": "com.karabaev.gameplay-tags.editor",
+    "rootNamespace": "com.karabaev.gameplayTags.editor",
+    "references": [
+        "com.karabaev.gameplay-tags",
+        "com.karabaev.gameplay-tags.authoring"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
