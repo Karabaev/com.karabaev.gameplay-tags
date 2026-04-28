@@ -7,12 +7,12 @@ namespace com.karabaev.gameplayTags
   {
     public string[] TagNames = Array.Empty<string>();
 
-    public TagContainer Author()
+    public TagContainer Author(TagRegistry registry)
     {
-      var container = new TagContainer();
+      var container = registry.CreateContainer(TagNames.Length);
       foreach (var path in TagNames)
       {
-        container.Add(Tag.From(path));
+        container.Add(registry.Register(path));
       }
       return container;
     }

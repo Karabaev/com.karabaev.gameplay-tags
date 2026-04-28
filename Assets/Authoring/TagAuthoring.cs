@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace com.karabaev.gameplayTags
 {
@@ -8,6 +7,6 @@ namespace com.karabaev.gameplayTags
   {
     public string Name = string.Empty;
 
-    public Tag Author() => Tag.From(Name);
+    public Tag Author(TagRegistry registry) => registry.Register(Name);
   }
 }

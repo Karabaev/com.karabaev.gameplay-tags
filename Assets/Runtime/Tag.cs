@@ -2,50 +2,45 @@ using System;
 
 namespace com.karabaev.gameplayTags
 {
-  public unsafe struct Tag : IEquatable<Tag>
+  public readonly unsafe struct Tag : IEquatable<Tag>
   {
     public const char Separator = '.';
-    public const int MaxAncestors = 6;
     public static readonly Tag None = default;
 
     internal readonly long Value;
-    internal fixed long Ancestors[MaxAncestors];
+    private readonly long* _ancestors;
     internal readonly int Depth;
 
     private Tag(long value, long* ancestors, int depth)
     {
       Value = value;
-      Depth = depth < MaxAncestors ? depth : MaxAncestors;
-      for (var i = 0; i < Depth; i++)
-      {
-        Ancestors[i] = ancestors[i];
-      }
+      _ancestors = ancestors;
+      Depth = depth;
     }
 
     /// <summary>
     /// Creates a Tag from a dot-separated hierarchical path (e.g. "Damage.Fire.Burning").
-    /// The full ancestor chain is embedded in the struct — no registry needed for hierarchy queries.
+    /// Ancestor hashes are written into <paramref name="ancestors"/> (caller-owned buffer,
+    /// must have at least as many elements as there are separators in <paramref name="name"/>).
+    /// Pass null for root-level tags (no separator). The buffer must outlive all uses of the Tag.
     /// </summary>
-    public static Tag From(string path)
+    public static Tag From(string name, long* ancestors)
     {
-      if(string.IsNullOrEmpty(path))
-        return None;
+      if(string.IsNullOrEmpty(name)) throw new InvalidOperationException("Tag name cannot be null or empty");
 
-      var value = ComputeHash(path.AsSpan());
-
+      var value = ComputeHash(name.AsSpan());
       var depth = 0;
-      var ancestorHashes = stackalloc long[MaxAncestors];
 
-      var remaining = path.AsSpan();
+      var remaining = name.AsSpan();
       var dotIndex = remaining.LastIndexOf(Separator);
-      while(dotIndex >= 0 && depth < MaxAncestors)
+      while(dotIndex >= 0)
       {
-        remaining = remaining.Slice(0, dotIndex);
-        ancestorHashes[depth++] = ComputeHash(remaining);
+        remaining = remaining[..dotIndex];
+        ancestors[depth++] = ComputeHash(remaining);
         dotIndex = remaining.LastIndexOf(Separator);
       }
 
-      return new Tag(value, ancestorHashes, depth);
+      return new Tag(value, ancestors, depth);
     }
 
     public bool IsNone => Value == 0;
@@ -54,31 +49,25 @@ namespace com.karabaev.gameplayTags
     /// Returns true if this tag is a direct or indirect child of <paramref name="ancestor"/>.
     /// Returns false for equal tags — use <see cref="IsOrIsChildOf"/> for that.
     /// </summary>
-    public readonly bool IsChildOf(in Tag ancestor)
+    public bool IsChildOf(in Tag ancestor)
     {
-      if(ancestor.IsNone)
-        return false;
+      if(ancestor.IsNone) return false;
 
-      fixed(Tag* self = &this)
+      for(var i = 0; i < Depth; i++)
       {
-        for(var i = 0; i < self->Depth; i++)
-          if(self->Ancestors[i] == ancestor.Value)
-            return true;
+        if(_ancestors[i] == ancestor.Value) return true;
       }
       return false;
     }
 
     /// <summary>Returns true if this tag equals <paramref name="other"/> or is a child of it.</summary>
-    public readonly bool IsOrIsChildOf(in Tag other) => this == other || IsChildOf(in other);
+    public bool IsOrIsChildOf(in Tag other) => this == other || IsChildOf(in other);
 
-    internal readonly void CopyAncestorsTo(long* dest, int maxCount)
+    internal void CopyAncestorsTo(long* dest, int maxCount)
     {
-      fixed(Tag* self = &this)
-      {
-        var count = self->Depth < maxCount ? self->Depth : maxCount;
-        for(var i = 0; i < count; i++)
-          dest[i] = self->Ancestors[i];
-      }
+      var count = Depth < maxCount ? Depth : maxCount;
+      for(var i = 0; i < count; i++)
+        dest[i] = _ancestors[i];
     }
 
     public bool Equals(Tag other) => Value == other.Value;

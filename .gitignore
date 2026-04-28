@@ -70,3 +70,5 @@ Assets/Plugins/Editor/JetBrains*
 
 _ReSharper.Caches/
 /ProjectSettings/AndroidLogcatSettings.asset
+
+.out/

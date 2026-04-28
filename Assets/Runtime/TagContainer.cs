@@ -1,22 +1,39 @@
 namespace com.karabaev.gameplayTags
 {
   /// <summary>
-  /// A fixed-capacity, unmanaged collection of Tags. Safe to use in Burst-compiled code.
-  /// Stores ancestor data inline so hierarchy queries (Has) require no external registry.
+  /// An unmanaged view over externally-supplied buffers that stores a collection of Tags.
+  /// Safe to use in Burst-compiled code. Stores ancestor data inline so hierarchy queries
+  /// (Has) require no external registry.
+  ///
+  /// Callers own the backing buffers and must ensure they outlive this struct.
+  /// Use <see cref="TagRegistry.CreateContainer"/> to let the registry handle allocation.
+  ///
+  /// The default no-arg constructor produces a zero-capacity container: IsFull is true
+  /// and all mutating operations are no-ops, so it is safe to pass as an empty value.
   /// </summary>
   public unsafe struct TagContainer
   {
-    public const int MaxTags = 8;
-
     // Parallel arrays — slot i holds _hashes[i], _depths[i], and
-    // ancestors at _ancestors[i * Tag.MaxAncestors .. + _depths[i]].
-    private fixed long _hashes[MaxTags];
-    private fixed long _ancestors[MaxTags * Tag.MaxAncestors];
-    private fixed int _depths[MaxTags];
+    // ancestors at _ancestors[i * _ancestorStride .. + _depths[i]].
+    private readonly long* _hashes;
+    private readonly long* _ancestors;
+    private readonly int* _depths;
+    private readonly int _capacity;
+    private readonly int _ancestorStride;
     private int _count;
 
     public int Count => _count;
-    public bool IsFull => _count >= MaxTags;
+    public bool IsFull => _count >= _capacity;
+
+    public TagContainer(long* hashes, long* ancestors, int* depths, int capacity, int ancestorStride)
+    {
+      _hashes = hashes;
+      _ancestors = ancestors;
+      _depths = depths;
+      _capacity = capacity;
+      _ancestorStride = ancestorStride;
+      _count = 0;
+    }
 
     /// <summary>
     /// Adds the tag. Duplicate and full-container additions are silently ignored.
@@ -29,10 +46,7 @@ namespace com.karabaev.gameplayTags
       var slot = _count;
       _hashes[slot] = tag.Value;
       _depths[slot] = tag.Depth;
-
-      fixed(long* ancestorsDest = _ancestors)
-        tag.CopyAncestorsTo(ancestorsDest + slot * Tag.MaxAncestors, Tag.MaxAncestors);
-
+      tag.CopyAncestorsTo(_ancestors + slot * _ancestorStride, _ancestorStride);
       _count++;
     }
 
@@ -52,8 +66,8 @@ namespace com.karabaev.gameplayTags
 
           var src = j + 1;
           var dst = j;
-          for(var k = 0; k < Tag.MaxAncestors; k++)
-            _ancestors[dst * Tag.MaxAncestors + k] = _ancestors[src * Tag.MaxAncestors + k];
+          for(var k = 0; k < _ancestorStride; k++)
+            _ancestors[dst * _ancestorStride + k] = _ancestors[src * _ancestorStride + k];
         }
 
         _count--;
@@ -74,12 +88,7 @@ namespace com.karabaev.gameplayTags
     /// Returns true if this container holds <paramref name="parentTag"/> itself
     /// OR any tag that is a child (direct or indirect) of <paramref name="parentTag"/>.
     /// </summary>
-    public bool Has(in Tag parentTag)
-    {
-      if(parentTag.IsNone)
-        return false;
-      return HasByHash(parentTag.Value);
-    }
+    public bool Has(in Tag parentTag) => HasByHash(parentTag.Value);
 
     /// <summary>
     /// Returns true if, for every tag in <paramref name="other"/>, this container
@@ -88,8 +97,9 @@ namespace com.karabaev.gameplayTags
     public bool HasAll(in TagContainer other)
     {
       for(var i = 0; i < other._count; i++)
-        if(!HasByHash(other._hashes[i]))
-          return false;
+      {
+        if(!HasByHash(other._hashes[i])) return false;
+      }
       return true;
     }
 
@@ -99,13 +109,13 @@ namespace com.karabaev.gameplayTags
     {
       for(var i = 0; i < _count; i++)
       {
-        if(_hashes[i] == parentHash)
-          return true;
+        if(_hashes[i] == parentHash) return true;
 
-        var ancestorBase = i * Tag.MaxAncestors;
+        var ancestorBase = i * _ancestorStride;
         for(var k = 0; k < _depths[i]; k++)
-          if(_ancestors[ancestorBase + k] == parentHash)
-            return true;
+        {
+          if(_ancestors[ancestorBase + k] == parentHash) return true;
+        }
       }
       return false;
     }

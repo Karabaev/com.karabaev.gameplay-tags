@@ -1,48 +1,114 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace com.karabaev.gameplayTags
 {
   /// <summary>
-  /// Managed name-lookup table built from tag path strings.
-  /// Provides human-readable names for Tags at edit/debug time.
-  /// Not required for runtime hierarchy queries — those are self-contained in Tag.
+  /// Manages Tag and TagContainer creation, owns all backing buffers, and provides
+  /// human-readable name lookup at edit/debug time.
+  ///
+  /// All Tags and TagContainers produced by this registry remain valid until
+  /// <see cref="Dispose"/> is called. Hierarchy queries on those values are safe
+  /// within that lifetime.
   /// </summary>
-  public class TagRegistry
+  public class TagRegistry : IDisposable
   {
     private readonly Dictionary<long, string> _namesByHash = new();
+    private readonly List<GCHandle> _handles = new();
+    private int _maxDepth;
 
     /// <summary>
-    /// Registers a full dot-separated path and all its implicit ancestor paths.
-    /// Returns the Tag for the given path.
-    /// Duplicate registrations are silently ignored.
+    /// Registers a full dot-separated name and all its implicit ancestor names.
+    /// Returns the Tag for the given name. Duplicate registrations are silently ignored.
     /// </summary>
-    public Tag Register(string path)
+    public Tag Register(string tagName)
     {
-      if(string.IsNullOrEmpty(path))
-        return Tag.None;
+      if(string.IsNullOrEmpty(tagName)) throw new InvalidOperationException("Tag name cannot be null or empty");
 
-      var tag = Tag.From(path);
-      _namesByHash.TryAdd(tag.Value, path);
+      var tag = CreateTag(tagName);
+      _namesByHash.TryAdd(tag.Value, tagName);
 
-      // Walk up the path and register each ancestor so TryGetName works for them too.
-      var remaining = path.AsSpan();
-      var dotIndex = remaining.LastIndexOf('.');
+      var remaining = tagName.AsSpan();
+      var dotIndex = remaining.LastIndexOf(Tag.Separator);
       while(dotIndex > 0)
       {
-        remaining = remaining.Slice(0, dotIndex);
+        remaining = remaining[..dotIndex];
         var ancestorPath = remaining.ToString();
-        var ancestorTag = Tag.From(ancestorPath);
-        _namesByHash.TryAdd(ancestorTag.Value, ancestorPath);
-        dotIndex = remaining.LastIndexOf('.');
+        _namesByHash.TryAdd(CreateTag(ancestorPath).Value, ancestorPath);
+        dotIndex = remaining.LastIndexOf(Tag.Separator);
       }
 
       return tag;
+    }
+
+    /// <summary>
+    /// Allocates backing buffers for a TagContainer of the given capacity and returns it.
+    /// The ancestor stride is sized to the deepest tag registered so far.
+    /// Register all tags before creating containers that will hold them.
+    /// The buffers are owned by this registry and freed on <see cref="Dispose"/>.
+    /// </summary>
+    public unsafe TagContainer CreateContainer(int capacity)
+    {
+      var stride = _maxDepth;
+      var hashes = Pin(new long[capacity]);
+      var depths = Pin(new int[capacity]);
+      long* ancestors = null;
+      if (stride > 0)
+      {
+        ancestors = (long*)Pin(new long[capacity * stride]).AddrOfPinnedObject().ToPointer();
+      }
+      return new TagContainer(
+        (long*)hashes.AddrOfPinnedObject().ToPointer(),
+        ancestors,
+        (int*)depths.AddrOfPinnedObject().ToPointer(),
+        capacity, stride);
     }
 
     public bool TryGetName(in Tag tag, out string name) =>
       _namesByHash.TryGetValue(tag.Value, out name!);
 
     public bool IsKnown(in Tag tag) => _namesByHash.ContainsKey(tag.Value);
+
+    public void Dispose()
+    {
+      foreach (var h in _handles)
+      {
+        h.Free();
+      }
+      
+      _handles.Clear();
+    }
+
+    private unsafe Tag CreateTag(string name)
+    {
+      var depth = CountSeparators(name);
+      if (depth > _maxDepth) _maxDepth = depth;
+      
+      long* ancestors = null;
+      if (depth > 0)
+      {
+        ancestors = (long*)Pin(new long[depth]).AddrOfPinnedObject().ToPointer();
+      }
+
+      return Tag.From(name, ancestors);
+    }
+
+    private GCHandle Pin(object array)
+    {
+      var handle = GCHandle.Alloc(array, GCHandleType.Pinned);
+      _handles.Add(handle);
+      return handle;
+    }
+
+    private static int CountSeparators(string name)
+    {
+      var count = 0;
+      foreach (var c in name)
+      {
+        if(c == Tag.Separator) count++;
+      }
+      return count;
+    }
   }
 }
