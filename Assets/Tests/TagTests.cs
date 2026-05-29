@@ -1,21 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using NUnit.Framework;
 
 namespace com.karabaev.gameplayTags.tests
 {
-  public class TagTests
+  public class TagTests : TagTestBase
   {
-    private readonly List<IntPtr> _allocs = new();
-
-    [TearDown]
-    public void TearDown()
-    {
-      foreach(var p in _allocs) Marshal.FreeHGlobal(p);
-      _allocs.Clear();
-    }
-    
     [Test]
     public void From_SamePath_ProducesEqualTags()
     {
@@ -48,7 +37,7 @@ namespace com.karabaev.gameplayTags.tests
     {
       Assert.AreNotEqual(MakeTag("Damage.Fire"), MakeTag("damage.fire"));
     }
-    
+
     [Test]
     public void IsChildOf_DirectChild_ReturnsTrue()
     {
@@ -91,7 +80,7 @@ namespace com.karabaev.gameplayTags.tests
       Assert.IsTrue(MakeTag("A.B.C.D.E").IsChildOf(MakeTag("A")));
       Assert.IsTrue(MakeTag("A.B.C.D.E").IsChildOf(MakeTag("A.B.C")));
     }
-    
+
     [Test]
     public void IsOrIsChildOf_ExactMatch_ReturnsTrue()
     {
@@ -109,223 +98,7 @@ namespace com.karabaev.gameplayTags.tests
     {
       Assert.IsFalse(MakeTag("Ability").IsOrIsChildOf(MakeTag("Damage")));
     }
-    
-    [Test]
-    public void Add_IncreasesCount()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.AreEqual(1, c.Count);
-    }
 
-    [Test]
-    public void Add_Duplicate_DoesNotIncreaseCount()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.AreEqual(1, c.Count);
-    }
-
-    [Test]
-    public void Add_None_IsIgnored()
-    {
-      var c = MakeContainer();
-      c.Add(Tag.None);
-      Assert.AreEqual(0, c.Count);
-    }
-
-    [Test]
-    public void HasExact_PresentTag_ReturnsTrue()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.IsTrue(c.HasExact(MakeTag("Damage.Fire")));
-    }
-
-    [Test]
-    public void HasExact_AbsentTag_ReturnsFalse()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.IsFalse(c.HasExact(MakeTag("Damage")));
-      Assert.IsFalse(c.HasExact(MakeTag("Damage.Fire.Burning")));
-    }
-    
-    [Test]
-    public void Remove_PresentTag_RemovesIt()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      c.Remove(MakeTag("Damage.Fire"));
-      Assert.AreEqual(0, c.Count);
-      Assert.IsFalse(c.HasExact(MakeTag("Damage.Fire")));
-    }
-
-    [Test]
-    public void Remove_AbsentTag_DoesNothing()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      c.Remove(MakeTag("Ability"));
-      Assert.AreEqual(1, c.Count);
-    }
-
-    [Test]
-    public void Remove_MiddleElement_ShiftsRemainingCorrectly()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("A"));
-      c.Add(MakeTag("B"));
-      c.Add(MakeTag("C"));
-      c.Remove(MakeTag("B"));
-      Assert.AreEqual(2, c.Count);
-      Assert.IsTrue(c.HasExact(MakeTag("A")));
-      Assert.IsTrue(c.HasExact(MakeTag("C")));
-      Assert.IsFalse(c.HasExact(MakeTag("B")));
-    }
-
-    [Test]
-    public void Has_ExactTagPresent_ReturnsTrue()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.IsTrue(c.Has(MakeTag("Damage.Fire")));
-    }
-
-    [Test]
-    public void Has_ParentOfPresentTag_ReturnsTrue()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire.Burning"));
-      Assert.IsTrue(c.Has(MakeTag("Damage.Fire")));
-      Assert.IsTrue(c.Has(MakeTag("Damage")));
-    }
-
-    [Test]
-    public void Has_ChildOfPresentTag_ReturnsFalse()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.IsFalse(c.Has(MakeTag("Damage.Fire.Burning")));
-    }
-
-    [Test]
-    public void Has_UnrelatedTag_ReturnsFalse()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire.Burning"));
-      Assert.IsFalse(c.Has(MakeTag("Ability")));
-    }
-
-    [Test]
-    public void Has_None_ReturnsFalse()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.IsFalse(c.Has(Tag.None));
-    }
-
-    [Test]
-    public void HasAll_AllPresent_ReturnsTrue()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire.Burning"));
-      c.Add(MakeTag("Ability.Heal"));
-
-      var required = MakeContainer();
-      required.Add(MakeTag("Damage.Fire")); // ancestor of stored tag
-      required.Add(MakeTag("Ability.Heal")); // exact match
-
-      Assert.IsTrue(c.HasAll(required));
-    }
-
-    [Test]
-    public void HasAll_OneMissing_ReturnsFalse()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire.Burning"));
-
-      var required = MakeContainer();
-      required.Add(MakeTag("Damage.Fire"));
-      required.Add(MakeTag("Ability")); // not present
-
-      Assert.IsFalse(c.HasAll(required));
-    }
-
-    [Test]
-    public void HasAll_EmptyOther_ReturnsTrue()
-    {
-      var c = MakeContainer();
-      c.Add(MakeTag("Damage.Fire"));
-      Assert.IsTrue(c.HasAll(new TagContainer()));
-    }
-
-    [Test]
-    public void AddContainer_NoDuplicatesInResult()
-    {
-      var dst = MakeContainer();
-      dst.Add(MakeTag("Damage.Fire"));
-
-      var src = MakeContainer();
-      src.Add(MakeTag("Damage.Fire")); // already in dst
-      src.Add(MakeTag("Ability.Heal"));
-
-      dst.Add(src);
-
-      Assert.AreEqual(2, dst.Count);
-      Assert.IsTrue(dst.HasExact(MakeTag("Damage.Fire")));
-      Assert.IsTrue(dst.HasExact(MakeTag("Ability.Heal")));
-    }
-
-    [Test]
-    public void AddContainer_TooSmall_ThrowsInvalidOperationException()
-    {
-      var dst = MakeContainer(capacity: 1);
-      dst.Add(MakeTag("Damage.Fire"));
-
-      var src = MakeContainer();
-      src.Add(MakeTag("Ability.Heal")); // one new tag, no free slots
-
-      Assert.Throws<InvalidOperationException>(() => dst.Add(src));
-    }
-
-    [Test]
-    public void Registry_Register_ReturnsCorrectTag()
-    {
-      using var registry = new TagRegistry();
-      Assert.AreEqual(MakeTag("Damage.Fire.Burning"), registry.Register("Damage.Fire.Burning"));
-    }
-
-    [Test]
-    public void Registry_TryGetName_ReturnsPath()
-    {
-      using var registry = new TagRegistry();
-      registry.Register("Damage.Fire.Burning");
-
-      Assert.IsTrue(registry.TryGetName(MakeTag("Damage.Fire.Burning"), out var name));
-      Assert.AreEqual("Damage.Fire.Burning", name);
-    }
-
-    [Test]
-    public void Registry_Register_AlsoRegistersAncestors()
-    {
-      using var registry = new TagRegistry();
-      registry.Register("Damage.Fire.Burning");
-
-      Assert.IsTrue(registry.IsKnown(MakeTag("Damage.Fire")));
-      Assert.IsTrue(registry.IsKnown(MakeTag("Damage")));
-    }
-
-    [Test]
-    public void Registry_DuplicateRegister_IsIdempotent()
-    {
-      using var registry = new TagRegistry();
-      var first = registry.Register("Damage.Fire");
-      var second = registry.Register("Damage.Fire");
-      Assert.AreEqual(first, second);
-    }
-    
     [Test]
     public void ValidatePath_ValidPath_ReturnsNull() =>
       Assert.IsNull(TagUtils.ValidatePath("Damage.Fire.Burning"));
@@ -361,99 +134,5 @@ namespace com.karabaev.gameplayTags.tests
     [Test]
     public void ValidatePath_MaxLength_ReturnsNull() =>
       Assert.IsNull(TagUtils.ValidatePath(new string('A', 256)));
-
-    [Test]
-    public void FreeContainer_ZeroesContainer()
-    {
-      using var registry = new TagRegistry();
-      registry.Register("Damage.Fire");
-      var container = registry.CreateContainer(4);
-      container.Add(registry.Register("Damage.Fire"));
-
-      registry.FreeContainer(ref container);
-
-      Assert.AreEqual(0, container.Count);
-      Assert.AreEqual(0, container.Id);
-    }
-
-    [Test]
-    public void FreeContainer_DoubleFree_IsNoOp()
-    {
-      using var registry = new TagRegistry();
-      registry.Register("Damage");
-      var container = registry.CreateContainer(2);
-
-      registry.FreeContainer(ref container);
-      Assert.DoesNotThrow(() => registry.FreeContainer(ref container));
-    }
-
-    [Test]
-    public void FreeContainer_DefaultContainer_IsNoOp()
-    {
-      using var registry = new TagRegistry();
-      var container = default(TagContainer);
-      Assert.DoesNotThrow(() => registry.FreeContainer(ref container));
-    }
-
-    [Test]
-    public void FreeContainer_ContainerIsNotValid()
-    {
-      using var registry = new TagRegistry();
-      var tag = registry.Register("Damage.Fire");
-      var container = registry.CreateContainer(4);
-      container.Add(tag);
-      registry.FreeContainer(ref container);
-
-      Assert.IsFalse(container.IsValid);
-    }
-
-    [Test]
-    public void FreeContainer_ThenDispose_DoesNotThrow()
-    {
-      var registry = new TagRegistry();
-      registry.Register("Damage.Fire");
-      var c1 = registry.CreateContainer(2);
-      var c2 = registry.CreateContainer(2);
-
-      registry.FreeContainer(ref c1);
-      Assert.DoesNotThrow(() => registry.Dispose());
-    }
-    
-    private unsafe Tag MakeTag(string path)
-    {
-      var depth = CountSeparators(path);
-      long* ancestors = null;
-      if(depth > 0)
-      {
-        var mem = (long*)Marshal.AllocHGlobal(depth * sizeof(long)).ToPointer();
-        _allocs.Add(new IntPtr(mem));
-        ancestors = mem;
-      }
-      return Tag.From(path, ancestors);
-    }
-
-    private unsafe TagContainer MakeContainer(int capacity = 8, int ancestorStride = 8)
-    {
-      var hashBytes = capacity * sizeof(long);
-      var ancestorBytes = capacity * ancestorStride * sizeof(long);
-      var depthBytes = capacity * sizeof(int);
-      var mem = (byte*)Marshal.AllocHGlobal(hashBytes + ancestorBytes + depthBytes).ToPointer();
-      _allocs.Add(new IntPtr(mem));
-      new Span<byte>(mem, hashBytes + ancestorBytes + depthBytes).Clear();
-      var h = (long*)mem;
-      var a = (long*)(mem + hashBytes);
-      var d = (int*)(mem + hashBytes + ancestorBytes);
-      return new TagContainer(0, h, a, d, capacity, ancestorStride);
-    }
-
-    private static int CountSeparators(string path)
-    {
-      var count = 0;
-      foreach (var c in path)
-      {
-        if(c == Tag.Separator) count++;
-      }
-      return count;
-    }
   }
 }
