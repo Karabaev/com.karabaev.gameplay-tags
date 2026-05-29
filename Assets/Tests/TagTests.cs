@@ -7,48 +7,13 @@ namespace com.karabaev.gameplayTags.tests
 {
   public class TagTests
   {
-    private readonly List<IntPtr> _allocs = new List<IntPtr>();
+    private readonly List<IntPtr> _allocs = new();
 
     [TearDown]
     public void TearDown()
     {
       foreach(var p in _allocs) Marshal.FreeHGlobal(p);
       _allocs.Clear();
-    }
-
-    private unsafe Tag MakeTag(string path)
-    {
-      var depth = CountSeparators(path);
-      long* ancestors = null;
-      if(depth > 0)
-      {
-        var mem = (long*)Marshal.AllocHGlobal(depth * sizeof(long)).ToPointer();
-        _allocs.Add(new IntPtr(mem));
-        ancestors = mem;
-      }
-      return Tag.From(path, ancestors);
-    }
-
-    private unsafe TagContainer MakeContainer(int capacity = 8, int ancestorStride = 8)
-    {
-      var hashBytes = capacity * sizeof(long);
-      var ancestorBytes = capacity * ancestorStride * sizeof(long);
-      var depthBytes = capacity * sizeof(int);
-      var mem = (byte*)Marshal.AllocHGlobal(hashBytes + ancestorBytes + depthBytes).ToPointer();
-      _allocs.Add(new IntPtr(mem));
-      new Span<byte>(mem, hashBytes + ancestorBytes + depthBytes).Clear();
-      var h = (long*)mem;
-      var a = (long*)(mem + hashBytes);
-      var d = (int*)(mem + hashBytes + ancestorBytes);
-      return new TagContainer(h, a, d, capacity, ancestorStride);
-    }
-
-    private static int CountSeparators(string path)
-    {
-      var count = 0;
-      foreach(var c in path)
-        if(c == Tag.Separator) count++;
-      return count;
     }
     
     [Test]
@@ -367,5 +332,99 @@ namespace com.karabaev.gameplayTags.tests
     [Test]
     public void ValidatePath_MaxLength_ReturnsNull() =>
       Assert.IsNull(TagUtils.ValidatePath(new string('A', 256)));
+
+    [Test]
+    public void FreeContainer_ZeroesContainer()
+    {
+      using var registry = new TagRegistry();
+      registry.Register("Damage.Fire");
+      var container = registry.CreateContainer(4);
+      container.Add(registry.Register("Damage.Fire"));
+
+      registry.FreeContainer(ref container);
+
+      Assert.AreEqual(0, container.Count);
+      Assert.AreEqual(0, container.Id);
+    }
+
+    [Test]
+    public void FreeContainer_DoubleFree_IsNoOp()
+    {
+      using var registry = new TagRegistry();
+      registry.Register("Damage");
+      var container = registry.CreateContainer(2);
+
+      registry.FreeContainer(ref container);
+      Assert.DoesNotThrow(() => registry.FreeContainer(ref container));
+    }
+
+    [Test]
+    public void FreeContainer_DefaultContainer_IsNoOp()
+    {
+      using var registry = new TagRegistry();
+      var container = default(TagContainer);
+      Assert.DoesNotThrow(() => registry.FreeContainer(ref container));
+    }
+
+    [Test]
+    public void FreeContainer_ContainerIsNotValid()
+    {
+      using var registry = new TagRegistry();
+      var tag = registry.Register("Damage.Fire");
+      var container = registry.CreateContainer(4);
+      container.Add(tag);
+      registry.FreeContainer(ref container);
+
+      Assert.IsFalse(container.IsValid);
+    }
+
+    [Test]
+    public void FreeContainer_ThenDispose_DoesNotThrow()
+    {
+      var registry = new TagRegistry();
+      registry.Register("Damage.Fire");
+      var c1 = registry.CreateContainer(2);
+      var c2 = registry.CreateContainer(2);
+
+      registry.FreeContainer(ref c1);
+      Assert.DoesNotThrow(() => registry.Dispose());
+    }
+    
+    private unsafe Tag MakeTag(string path)
+    {
+      var depth = CountSeparators(path);
+      long* ancestors = null;
+      if(depth > 0)
+      {
+        var mem = (long*)Marshal.AllocHGlobal(depth * sizeof(long)).ToPointer();
+        _allocs.Add(new IntPtr(mem));
+        ancestors = mem;
+      }
+      return Tag.From(path, ancestors);
+    }
+
+    private unsafe TagContainer MakeContainer(int capacity = 8, int ancestorStride = 8)
+    {
+      var hashBytes = capacity * sizeof(long);
+      var ancestorBytes = capacity * ancestorStride * sizeof(long);
+      var depthBytes = capacity * sizeof(int);
+      var mem = (byte*)Marshal.AllocHGlobal(hashBytes + ancestorBytes + depthBytes).ToPointer();
+      _allocs.Add(new IntPtr(mem));
+      new Span<byte>(mem, hashBytes + ancestorBytes + depthBytes).Clear();
+      var h = (long*)mem;
+      var a = (long*)(mem + hashBytes);
+      var d = (int*)(mem + hashBytes + ancestorBytes);
+      return new TagContainer(0, h, a, d, capacity, ancestorStride);
+    }
+
+    private static int CountSeparators(string path)
+    {
+      var count = 0;
+      foreach (var c in path)
+      {
+        if(c == Tag.Separator) count++;
+      }
+      return count;
+    }
   }
 }

@@ -21,12 +21,15 @@ namespace com.karabaev.gameplayTags
     private readonly int _capacity;
     private readonly int _ancestorStride;
     private int _count;
+    internal readonly uint Id;
 
+    public bool IsValid => _hashes != null && _depths != null;
     public int Count => _count;
     public bool IsFull => _count >= _capacity;
 
-    public TagContainer(long* hashes, long* ancestors, int* depths, int capacity, int ancestorStride)
+    public TagContainer(uint id, long* hashes, long* ancestors, int* depths, int capacity, int ancestorStride)
     {
+      Id = id;
       _hashes = hashes;
       _ancestors = ancestors;
       _depths = depths;
@@ -40,8 +43,7 @@ namespace com.karabaev.gameplayTags
     /// </summary>
     public void Add(in Tag tag)
     {
-      if(tag.IsNone || HasExact(in tag) || IsFull)
-        return;
+      if (tag.IsNone || HasExact(in tag) || IsFull) return;
 
       var slot = _count;
       _hashes[slot] = tag.Value;
@@ -53,21 +55,22 @@ namespace com.karabaev.gameplayTags
     /// <summary>Removes the first tag that exactly matches. No-op if not present.</summary>
     public void Remove(in Tag tag)
     {
-      for(var i = 0; i < _count; i++)
+      for (var i = 0; i < _count; i++)
       {
-        if(_hashes[i] != tag.Value)
-          continue;
+        if (_hashes[i] != tag.Value) continue;
 
         // Shift subsequent slots down.
-        for(var j = i; j < _count - 1; j++)
+        for (var j = i; j < _count - 1; j++)
         {
           _hashes[j] = _hashes[j + 1];
           _depths[j] = _depths[j + 1];
 
           var src = j + 1;
           var dst = j;
-          for(var k = 0; k < _ancestorStride; k++)
+          for (var k = 0; k < _ancestorStride; k++)
+          {
             _ancestors[dst * _ancestorStride + k] = _ancestors[src * _ancestorStride + k];
+          }
         }
 
         _count--;
@@ -79,8 +82,9 @@ namespace com.karabaev.gameplayTags
     public bool HasExact(in Tag tag)
     {
       for(var i = 0; i < _count; i++)
-        if(_hashes[i] == tag.Value)
-          return true;
+      {
+        if(_hashes[i] == tag.Value) return true;
+      }
       return false;
     }
 
@@ -96,10 +100,11 @@ namespace com.karabaev.gameplayTags
     /// </summary>
     public bool HasAll(in TagContainer other)
     {
-      for(var i = 0; i < other._count; i++)
+      for (var i = 0; i < other._count; i++)
       {
-        if(!HasByHash(other._hashes[i])) return false;
+        if (!HasByHash(other._hashes[i])) return false;
       }
+
       return true;
     }
 
@@ -107,16 +112,17 @@ namespace com.karabaev.gameplayTags
     // A stored tag T is a child of parentHash if parentHash appears in T's ancestor list.
     private bool HasByHash(long parentHash)
     {
-      for(var i = 0; i < _count; i++)
+      for (var i = 0; i < _count; i++)
       {
-        if(_hashes[i] == parentHash) return true;
+        if (_hashes[i] == parentHash) return true;
 
         var ancestorBase = i * _ancestorStride;
-        for(var k = 0; k < _depths[i]; k++)
+        for (var k = 0; k < _depths[i]; k++)
         {
-          if(_ancestors[ancestorBase + k] == parentHash) return true;
+          if (_ancestors[ancestorBase + k] == parentHash) return true;
         }
       }
+
       return false;
     }
   }

@@ -16,7 +16,9 @@ namespace com.karabaev.gameplayTags
   {
     private readonly Dictionary<long, string> _namesByHash = new();
     private readonly List<GCHandle> _handles = new();
+    private readonly Dictionary<uint, ContainerHandles> _containerHandles = new();
     private int _maxDepth;
+    private uint _nextContainerId = 1;
 
     /// <summary>
     /// Registers a full dot-separated name and all its implicit ancestor names.
@@ -51,18 +53,40 @@ namespace com.karabaev.gameplayTags
     public unsafe TagContainer CreateContainer(int capacity)
     {
       var stride = _maxDepth;
-      var hashes = Pin(new long[capacity]);
-      var depths = Pin(new int[capacity]);
+      var hashesHandle = PinDetached(new long[capacity]);
+      var depthsHandle = PinDetached(new int[capacity]);
+
+      GCHandle ancestorsHandle = default;
       long* ancestors = null;
       if (stride > 0)
       {
-        ancestors = (long*)Pin(new long[capacity * stride]).AddrOfPinnedObject().ToPointer();
+        ancestorsHandle = PinDetached(new long[capacity * stride]);
+        ancestors = (long*)ancestorsHandle.AddrOfPinnedObject().ToPointer();
       }
-      return new TagContainer(
-        (long*)hashes.AddrOfPinnedObject().ToPointer(),
+
+      var container = new TagContainer(_nextContainerId++,
+        (long*)hashesHandle.AddrOfPinnedObject().ToPointer(),
         ancestors,
-        (int*)depths.AddrOfPinnedObject().ToPointer(),
+        (int*)depthsHandle.AddrOfPinnedObject().ToPointer(),
         capacity, stride);
+
+      _containerHandles[container.Id] = new ContainerHandles(hashesHandle, depthsHandle, ancestorsHandle);
+      return container;
+    }
+
+    /// <summary>
+    /// Frees the backing buffers of <paramref name="container"/> and zeroes it.
+    /// The Tags that were stored in it remain valid. Safe to call on a default container (no-op).
+    /// </summary>
+    public void FreeContainer(ref TagContainer container)
+    {
+      var id = container.Id;
+      if (id == 0) return;
+      if (!_containerHandles.Remove(id, out var handles)) return;
+
+      handles.Free();
+      
+      container = default;
     }
 
     public bool TryGetName(in Tag tag, out string name) =>
@@ -72,12 +96,11 @@ namespace com.karabaev.gameplayTags
 
     public void Dispose()
     {
-      foreach (var h in _handles)
-      {
-        h.Free();
-      }
-      
+      foreach (var h in _handles) h.Free();
       _handles.Clear();
+
+      foreach (var h in _containerHandles.Values) h.Free();
+      _containerHandles.Clear();
     }
 
     private unsafe Tag CreateTag(string name)
@@ -101,6 +124,9 @@ namespace com.karabaev.gameplayTags
       return handle;
     }
 
+    private static GCHandle PinDetached(object array) =>
+      GCHandle.Alloc(array, GCHandleType.Pinned);
+
     private static int CountSeparators(string name)
     {
       var count = 0;
@@ -109,6 +135,27 @@ namespace com.karabaev.gameplayTags
         if(c == Tag.Separator) count++;
       }
       return count;
+    }
+
+    private struct ContainerHandles
+    {
+      private GCHandle _hashes;
+      private GCHandle _depths;
+      private GCHandle _ancestors;
+
+      public void Free()
+      {
+        _hashes.Free();
+        _depths.Free();
+        if (_ancestors.IsAllocated) _ancestors.Free();
+      }
+
+      public ContainerHandles(GCHandle hashes, GCHandle depths, GCHandle ancestors)
+      {
+        _hashes = hashes;
+        _depths = depths;
+        _ancestors = ancestors;
+      }
     }
   }
 }

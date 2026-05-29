@@ -26,14 +26,14 @@ namespace com.karabaev.gameplayTags
     /// </summary>
     public static Tag From(string name, long* ancestors)
     {
-      if(string.IsNullOrEmpty(name)) throw new InvalidOperationException("Tag name cannot be null or empty");
+      if (string.IsNullOrEmpty(name)) throw new InvalidOperationException("Tag name cannot be null or empty");
 
       var value = ComputeHash(name.AsSpan());
       var depth = 0;
 
       var remaining = name.AsSpan();
       var dotIndex = remaining.LastIndexOf(Separator);
-      while(dotIndex >= 0)
+      while (dotIndex >= 0)
       {
         remaining = remaining[..dotIndex];
         ancestors[depth++] = ComputeHash(remaining);
