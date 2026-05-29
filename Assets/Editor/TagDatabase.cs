@@ -88,6 +88,14 @@ namespace com.karabaev.gameplayTags.editor
       return null;
     }
 
+    public void UpdateComment(string path, string comment)
+    {
+      var tag = FindTag(path);
+      if(tag == null) return;
+      tag.Comment = comment;
+      Save(true);
+    }
+
     public TagRegistry BuildRegistry()
     {
       var registry = new TagRegistry();

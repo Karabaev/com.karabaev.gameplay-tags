@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using com.karabaev.gameplayTags;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -36,8 +35,7 @@ namespace com.karabaev.gameplayTags.editor
     /// Width of the popup window. Pass the trigger button's width to match it.
     /// Defaults to <see cref="DefaultWidth"/> when zero or negative.
     /// </param>
-    public TagPickerPopup(
-      IReadOnlyList<string> currentPaths,
+    public TagPickerPopup(IReadOnlyList<string> currentPaths,
       bool multiSelect,
       Action<List<string>> changed,
       TagDatabase db,
@@ -48,7 +46,7 @@ namespace com.karabaev.gameplayTags.editor
       _changed = changed;
       _db = db;
       _selected = new HashSet<string>();
-      
+
       foreach (var p in currentPaths)
       {
         if (!string.IsNullOrEmpty(p))
@@ -63,7 +61,7 @@ namespace com.karabaev.gameplayTags.editor
       // GetWindowSize() is only an initial hint when CreateGUI() is used —
       // UI Toolkit can auto-resize the window after layout. Lock min/max to
       // prevent that and enforce the desired dimensions.
-      if(editorWindow == null) return;
+      if (editorWindow == null) return;
       editorWindow.minSize = new Vector2(_windowWidth, PopupHeight);
       editorWindow.maxSize = new Vector2(_windowWidth, PopupHeight);
     }
@@ -112,7 +110,7 @@ namespace com.karabaev.gameplayTags.editor
 
     public override void OnClose()
     {
-      if(_multiSelect)
+      if (_multiSelect)
         _changed(new List<string>(_selected));
     }
 
@@ -126,10 +124,10 @@ namespace com.karabaev.gameplayTags.editor
       var roots = TagTreeBuilder.Build(_db);
       var searching = !string.IsNullOrEmpty(_searchText);
 
-      if(searching)
+      if (searching)
         BuildSearchResults(roots);
       else
-        foreach(var node in roots)
+        foreach (var node in roots)
           BuildNodeElement(_treeContainer, node, depth: 0);
     }
 
@@ -137,16 +135,16 @@ namespace com.karabaev.gameplayTags.editor
     private void BuildOrphanedSection()
     {
       var dbPaths = new HashSet<string>();
-      foreach(var tag in _db.Tags)
-        if(!string.IsNullOrEmpty(tag.Name))
+      foreach (var tag in _db.Tags)
+        if (!string.IsNullOrEmpty(tag.Name))
           dbPaths.Add(tag.Name);
 
       var orphans = new List<string>();
-      foreach(var path in _selected)
-        if(!dbPaths.Contains(path))
+      foreach (var path in _selected)
+        if (!dbPaths.Contains(path))
           orphans.Add(path);
 
-      if(orphans.Count == 0) return;
+      if (orphans.Count == 0) return;
 
       // Section header
       var header = new Label("Not in database:");
@@ -157,7 +155,7 @@ namespace com.karabaev.gameplayTags.editor
       header.style.paddingBottom = 2;
       _treeContainer.Add(header);
 
-      foreach(var path in orphans)
+      foreach (var path in orphans)
       {
         var capturedPath = path;
         var row = new VisualElement();
@@ -175,7 +173,7 @@ namespace com.karabaev.gameplayTags.editor
         toggle.style.marginRight = 4;
         toggle.RegisterValueChangedCallback(evt =>
         {
-          if(!evt.newValue)
+          if (!evt.newValue)
             _selected.Remove(capturedPath);
           else
             _selected.Add(capturedPath);
@@ -189,7 +187,8 @@ namespace com.karabaev.gameplayTags.editor
         nameLabel.RegisterCallback<ClickEvent>(_ =>
         {
           var next = !_selected.Contains(capturedPath);
-          if(next) _selected.Add(capturedPath); else _selected.Remove(capturedPath);
+          if (next) _selected.Add(capturedPath);
+          else _selected.Remove(capturedPath);
           RebuildTree();
         });
         row.Add(nameLabel);
@@ -214,7 +213,7 @@ namespace com.karabaev.gameplayTags.editor
       var matches = new List<TagTreeBuilder.TagNode>();
       CollectMatches(roots, query, matches);
 
-      if(matches.Count == 0)
+      if (matches.Count == 0)
       {
         var empty = new Label("No tags match.");
         empty.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
@@ -224,18 +223,17 @@ namespace com.karabaev.gameplayTags.editor
         return;
       }
 
-      foreach(var node in matches)
+      foreach (var node in matches)
         _treeContainer.Add(MakeRow(node, depth: 0, showExpand: false));
     }
 
-    private static void CollectMatches(
-      List<TagTreeBuilder.TagNode> nodes,
+    private static void CollectMatches(List<TagTreeBuilder.TagNode> nodes,
       string query,
       List<TagTreeBuilder.TagNode> result)
     {
-      foreach(var node in nodes)
+      foreach (var node in nodes)
       {
-        if(node.IsDefined && node.FullPath.ToLowerInvariant().Contains(query))
+        if (node.IsDefined && node.FullPath.ToLowerInvariant().Contains(query))
           result.Add(node);
         CollectMatches(node.Children, query, result);
       }
@@ -244,12 +242,12 @@ namespace com.karabaev.gameplayTags.editor
     private void BuildNodeElement(VisualElement container, TagTreeBuilder.TagNode node, int depth)
     {
       container.Add(MakeRow(node, depth, showExpand: node.Children.Count > 0));
-      if(node.Children.Count == 0) return;
+      if (node.Children.Count == 0) return;
 
       var expanded = _expanded.GetValueOrDefault(node.FullPath, true);
-      if(!expanded) return;
+      if (!expanded) return;
 
-      foreach(var child in node.Children)
+      foreach (var child in node.Children)
         BuildNodeElement(container, child, depth + 1);
     }
 
@@ -262,7 +260,7 @@ namespace com.karabaev.gameplayTags.editor
       row.style.minHeight = 22;
 
       // Expand / collapse button or spacer
-      if(showExpand)
+      if (showExpand)
       {
         var isExpanded = _expanded.GetValueOrDefault(node.FullPath, true);
         var expandBtn = new Button { text = isExpanded ? "▼" : "▶" };
@@ -283,7 +281,7 @@ namespace com.karabaev.gameplayTags.editor
       }
 
       // Toggle (defined nodes only) or spacer
-      if(node.IsDefined)
+      if (node.IsDefined)
       {
         var isChecked = _selected.Contains(node.FullPath);
         var toggle = new Toggle { value = isChecked };
@@ -300,11 +298,12 @@ namespace com.karabaev.gameplayTags.editor
 
       var nameLabel = new Label(node.Segment);
       nameLabel.style.flexGrow = 1;
-      if(!node.IsDefined)
+      if (!node.IsDefined)
         nameLabel.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
 
-      if(node.IsDefined)
+      if (node.IsDefined)
       {
+        nameLabel.tooltip = node.Comment;
         nameLabel.style.cursor = new StyleCursor(new Cursor());
         nameLabel.RegisterCallback<ClickEvent>(_ =>
           OnToggleChanged(node.FullPath, !_selected.Contains(node.FullPath)));
@@ -317,9 +316,9 @@ namespace com.karabaev.gameplayTags.editor
 
     private void OnToggleChanged(string path, bool nowChecked)
     {
-      if(_multiSelect)
+      if (_multiSelect)
       {
-        if(nowChecked)
+        if (nowChecked)
           _selected.Add(path);
         else
           _selected.Remove(path);
@@ -329,7 +328,7 @@ namespace com.karabaev.gameplayTags.editor
       else
       {
         _selected.Clear();
-        if(nowChecked)
+        if (nowChecked)
           _selected.Add(path);
 
         _changed(new List<string>(_selected));

@@ -100,39 +100,43 @@ namespace com.karabaev.gameplayTags.editor
         nameLabel.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
         nameLabel.tooltip = "Implicit parent (not a defined tag)";
       }
+      else if(!string.IsNullOrEmpty(node.Comment))
+      {
+        nameLabel.tooltip = node.Comment;
+      }
       header.Add(nameLabel);
 
       var formContainer = new VisualElement();
 
-      var addBtn = new Button { text = "+", tooltip = "Add subtag" };
-      StyleIconButton(addBtn);
-      addBtn.clicked += () => ShowAddForm(node.FullPath, formContainer, db, rebuild);
-      header.Add(addBtn);
+      var addButton = new Button { text = "+", tooltip = "Add subtag" };
+      StyleIconButton(addButton);
+      addButton.clicked += () => ShowAddForm(node.FullPath, formContainer, db, rebuild);
+      header.Add(addButton);
 
       if(node.IsDefined)
       {
-        var renameBtn = new Button { text = "✎", tooltip = "Rename" };
-        StyleIconButton(renameBtn);
-        renameBtn.clicked += () => ShowRenameForm(node, formContainer, db, rebuild);
-        header.Add(renameBtn);
+        var editButton = new Button { text = "✎", tooltip = "Edit" };
+        StyleIconButton(editButton);
+        editButton.clicked += () => ShowEditForm(node, formContainer, db, rebuild);
+        header.Add(editButton);
 
-        var findBtn = new Button { tooltip = "Find usages in assets" };
-        StyleIconButton(findBtn);
+        var findButton = new Button { tooltip = "Find usages in assets" };
+        StyleIconButton(findButton);
         var searchIconContent = EditorGUIUtility.IconContent("Search Icon");
         if(searchIconContent?.image != null)
         {
           var img = new Image { image = searchIconContent.image, scaleMode = ScaleMode.ScaleToFit };
           img.style.width = 14;
           img.style.height = 14;
-          findBtn.Add(img);
+          findButton.Add(img);
         }
-        findBtn.clicked += () => TagUsageWindow.Open(node.FullPath);
-        header.Add(findBtn);
+        findButton.clicked += () => TagUsageWindow.Open(node.FullPath);
+        header.Add(findButton);
 
-        var removeBtn = new Button { text = "✕", tooltip = "Remove tag and all subtags" };
-        StyleIconButton(removeBtn);
-        removeBtn.style.color = new StyleColor(new Color(0.9f, 0.4f, 0.4f));
-        removeBtn.clicked += () =>
+        var removeButton = new Button { text = "✕", tooltip = "Remove tag and all subtags" };
+        StyleIconButton(removeButton);
+        removeButton.style.color = new StyleColor(new Color(0.9f, 0.4f, 0.4f));
+        removeButton.clicked += () =>
         {
           var hasChildren = node.Children.Count > 0;
           var message = hasChildren
@@ -147,16 +151,32 @@ namespace com.karabaev.gameplayTags.editor
             rebuild();
           }
         };
-        header.Add(removeBtn);
+        header.Add(removeButton);
       }
 
       nodeContainer.Add(header);
+
+      if(node.IsDefined && !string.IsNullOrEmpty(node.Comment))
+      {
+        var commentRow = new VisualElement();
+        commentRow.style.paddingLeft = depth * 16 + 22;
+        commentRow.style.marginBottom = 2;
+        var commentLabel = new Label(node.Comment);
+        commentLabel.style.color = new StyleColor(new Color(0.55f, 0.55f, 0.55f));
+        commentLabel.style.fontSize = 10;
+        commentLabel.style.unityFontStyleAndWeight = FontStyle.Italic;
+        commentRow.Add(commentLabel);
+        nodeContainer.Add(commentRow);
+      }
+
       nodeContainer.Add(formContainer);
 
       if(node.Children.Count > 0)
       {
-        foreach(var child in node.Children)
+        foreach (var child in node.Children)
+        {
           childrenContainer.Add(BuildNodeElement(child, db, rebuild));
+        }
         nodeContainer.Add(childrenContainer);
       }
 
@@ -229,7 +249,7 @@ namespace com.karabaev.gameplayTags.editor
       nameField.Focus();
     }
 
-    private static void ShowRenameForm(
+    private static void ShowEditForm(
       TagTreeBuilder.TagNode node,
       VisualElement formContainer,
       TagDatabase db,
@@ -239,8 +259,11 @@ namespace com.karabaev.gameplayTags.editor
 
       var form = CreateFormBox(CountDepth(node.FullPath));
 
-      var nameField = AddFormField(form, "New name");
+      var nameField = AddFormField(form, "Name");
       nameField.value = node.Segment;
+
+      var commentField = AddFormField(form, "Comment");
+      commentField.value = node.Comment;
 
       var errorLabel = CreateErrorLabel();
       form.Add(errorLabel);
@@ -274,6 +297,7 @@ namespace com.karabaev.gameplayTags.editor
 
         Undo.RecordObject(db, "Rename Gameplay Tag");
         db.RenameTag(node.FullPath, newSegment);
+        db.UpdateComment(newFullPath, commentField.value.Trim());
         AssetDatabase.SaveAssetIfDirty(db);
         rebuild();
       }) { text = "Apply" };

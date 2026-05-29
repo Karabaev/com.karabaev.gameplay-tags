@@ -9,21 +9,6 @@ namespace com.karabaev.gameplayTags.editor
   /// </summary>
   public static class TagTreeBuilder
   {
-    public sealed class TagNode
-    {
-      public readonly string FullPath;
-      public readonly string Segment;
-      public readonly bool IsDefined;
-      public readonly List<TagNode> Children = new();
-
-      public TagNode(string fullPath, string segment, bool isDefined)
-      {
-        FullPath = fullPath;
-        Segment = segment;
-        IsDefined = isDefined;
-      }
-    }
-
     public static List<TagNode> Build(TagDatabase db)
     {
       var nodesByPath = new Dictionary<string, TagNode>();
@@ -31,16 +16,16 @@ namespace com.karabaev.gameplayTags.editor
 
       // Collect all defined paths plus their implicit structural ancestors.
       var allPaths = new SortedSet<string>(StringComparer.Ordinal);
-      foreach(var tag in db.Tags)
+      foreach (var tag in db.Tags)
       {
-        if(string.IsNullOrEmpty(tag.Name)) continue;
+        if (string.IsNullOrEmpty(tag.Name)) continue;
         allPaths.Add(tag.Name);
 
         var span = tag.Name.AsSpan();
         var dot = span.LastIndexOf(Tag.Separator);
-        while(dot > 0)
+        while (dot > 0)
         {
-          span = span.Slice(0, dot);
+          span = span[..dot];
           allPaths.Add(span.ToString());
           dot = span.LastIndexOf(Tag.Separator);
         }
@@ -50,16 +35,34 @@ namespace com.karabaev.gameplayTags.editor
       {
         var lastDot = path.LastIndexOf(Tag.Separator);
         var segment = lastDot >= 0 ? path.Substring(lastDot + 1) : path;
-        var node = new TagNode(path, segment, db.ContainsPath(path));
+        var comment = db.FindTag(path)?.Comment ?? string.Empty;
+        var node = new TagNode(path, segment, db.ContainsPath(path), comment);
         nodesByPath[path] = node;
 
-        if(lastDot < 0)
+        if (lastDot < 0)
           roots.Add(node);
-        else if(nodesByPath.TryGetValue(path.Substring(0, lastDot), out var parent))
+        else if (nodesByPath.TryGetValue(path.Substring(0, lastDot), out var parent))
           parent.Children.Add(node);
       }
 
       return roots;
+    }
+
+    public sealed class TagNode
+    {
+      public readonly string FullPath;
+      public readonly string Segment;
+      public readonly bool IsDefined;
+      public readonly string Comment;
+      public readonly List<TagNode> Children = new();
+
+      public TagNode(string fullPath, string segment, bool isDefined, string comment)
+      {
+        FullPath = fullPath;
+        Segment = segment;
+        IsDefined = isDefined;
+        Comment = comment;
+      }
     }
   }
 }
