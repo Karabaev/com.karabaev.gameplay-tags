@@ -1,4 +1,5 @@
 using System;
+using com.karabaev.gameplayTags.editor.Usage;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -114,6 +115,19 @@ namespace com.karabaev.gameplayTags.editor
         StyleIconButton(renameBtn);
         renameBtn.clicked += () => ShowRenameForm(node, formContainer, db, rebuild);
         header.Add(renameBtn);
+
+        var findBtn = new Button { tooltip = "Find usages in assets" };
+        StyleIconButton(findBtn);
+        var searchIconContent = EditorGUIUtility.IconContent("Search Icon");
+        if(searchIconContent?.image != null)
+        {
+          var img = new Image { image = searchIconContent.image, scaleMode = ScaleMode.ScaleToFit };
+          img.style.width = 14;
+          img.style.height = 14;
+          findBtn.Add(img);
+        }
+        findBtn.clicked += () => TagUsageWindow.Open(node.FullPath);
+        header.Add(findBtn);
 
         var removeBtn = new Button { text = "✕", tooltip = "Remove tag and all subtags" };
         StyleIconButton(removeBtn);
