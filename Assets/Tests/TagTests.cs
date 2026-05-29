@@ -262,6 +262,35 @@ namespace com.karabaev.gameplayTags.tests
     }
 
     [Test]
+    public void AddContainer_NoDuplicatesInResult()
+    {
+      var dst = MakeContainer();
+      dst.Add(MakeTag("Damage.Fire"));
+
+      var src = MakeContainer();
+      src.Add(MakeTag("Damage.Fire")); // already in dst
+      src.Add(MakeTag("Ability.Heal"));
+
+      dst.Add(src);
+
+      Assert.AreEqual(2, dst.Count);
+      Assert.IsTrue(dst.HasExact(MakeTag("Damage.Fire")));
+      Assert.IsTrue(dst.HasExact(MakeTag("Ability.Heal")));
+    }
+
+    [Test]
+    public void AddContainer_TooSmall_ThrowsInvalidOperationException()
+    {
+      var dst = MakeContainer(capacity: 1);
+      dst.Add(MakeTag("Damage.Fire"));
+
+      var src = MakeContainer();
+      src.Add(MakeTag("Ability.Heal")); // one new tag, no free slots
+
+      Assert.Throws<InvalidOperationException>(() => dst.Add(src));
+    }
+
+    [Test]
     public void Registry_Register_ReturnsCorrectTag()
     {
       using var registry = new TagRegistry();

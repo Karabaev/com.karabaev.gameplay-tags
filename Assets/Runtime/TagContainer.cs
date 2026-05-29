@@ -1,3 +1,5 @@
+using System;
+
 namespace com.karabaev.gameplayTags
 {
   /// <summary>
@@ -52,6 +54,42 @@ namespace com.karabaev.gameplayTags
       _count++;
     }
 
+    /// <summary>
+    /// Adds all tags from <paramref name="other"/>.
+    /// Throws <see cref="System.InvalidOperationException"/> if there is not enough free space
+    /// for the tags that are not already present in this container.
+    /// </summary>
+    public void Add(in TagContainer other)
+    {
+      var newCount = 0;
+      for (var i = 0; i < other._count; i++)
+      {
+        if (!HasExactByHash(other._hashes[i])) newCount++;
+      }
+
+      if (_count + newCount > _capacity) throw new InvalidOperationException($"Not enough space in TagContainer: need {newCount} free slot(s), have {_capacity - _count}.");
+
+      for (var i = 0; i < other._count; i++)
+      {
+        var otherHash = other._hashes[i];
+        if (HasExactByHash(otherHash)) continue;
+
+        var slot = _count;
+        _hashes[slot] = otherHash;
+        _depths[slot] = other._depths[i];
+
+        var srcBase = i * other._ancestorStride;
+        var dstBase = slot * _ancestorStride;
+        var copyLen = other._depths[i] < _ancestorStride ? other._depths[i] : _ancestorStride;
+        for (var k = 0; k < copyLen; k++)
+        {
+          _ancestors[dstBase + k] = other._ancestors[srcBase + k];
+        }
+
+        _count++;
+      }
+    }
+
     /// <summary>Removes the first tag that exactly matches. No-op if not present.</summary>
     public void Remove(in Tag tag)
     {
@@ -79,11 +117,13 @@ namespace com.karabaev.gameplayTags
     }
 
     /// <summary>Returns true only if the exact tag hash is present.</summary>
-    public bool HasExact(in Tag tag)
+    public bool HasExact(in Tag tag) => HasExactByHash(tag.Value);
+
+    private bool HasExactByHash(long hash)
     {
-      for(var i = 0; i < _count; i++)
+      for (var i = 0; i < _count; i++)
       {
-        if(_hashes[i] == tag.Value) return true;
+        if (_hashes[i] == hash) return true;
       }
       return false;
     }
