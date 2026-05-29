@@ -91,29 +91,29 @@ namespace com.karabaev.gameplayTags
     }
 
     /// <summary>Removes the first tag that exactly matches. No-op if not present.</summary>
-    public void Remove(in Tag tag)
+    public void Remove(in Tag tag) => RemoveByHash(tag.Value);
+    
+    public void Remove(in TagContainer other)
     {
+      for (var i = 0; i < other._count; i++)
+      {
+        RemoveByHash(other._hashes[i]);
+      }
+    }
+
+    /// <summary>
+    /// Returns a new array containing one <see cref="Tag"/> per slot.
+    /// Each tag holds a raw pointer into this container's ancestor buffer,
+    /// so the array elements are only valid while this container is alive.
+    /// </summary>
+    public Tag[] ToArray()
+    {
+      var result = new Tag[_count];
       for (var i = 0; i < _count; i++)
       {
-        if (_hashes[i] != tag.Value) continue;
-
-        // Shift subsequent slots down.
-        for (var j = i; j < _count - 1; j++)
-        {
-          _hashes[j] = _hashes[j + 1];
-          _depths[j] = _depths[j + 1];
-
-          var src = j + 1;
-          var dst = j;
-          for (var k = 0; k < _ancestorStride; k++)
-          {
-            _ancestors[dst * _ancestorStride + k] = _ancestors[src * _ancestorStride + k];
-          }
-        }
-
-        _count--;
-        return;
+        result[i] = Tag.FromRaw(_hashes[i], _ancestors + i * _ancestorStride, _depths[i]);
       }
+      return result;
     }
 
     /// <summary>Returns true only if the exact tag hash is present.</summary>
@@ -148,6 +148,27 @@ namespace com.karabaev.gameplayTags
       return true;
     }
 
+    private void RemoveByHash(long hash)
+    {
+      for (var i = 0; i < _count; i++)
+      {
+        if (_hashes[i] != hash) continue;
+
+        for (var j = i; j < _count - 1; j++)
+        {
+          _hashes[j] = _hashes[j + 1];
+          _depths[j] = _depths[j + 1];
+          for (var k = 0; k < _ancestorStride; k++)
+          {
+            _ancestors[j * _ancestorStride + k] = _ancestors[(j + 1) * _ancestorStride + k];
+          }
+        }
+
+        _count--;
+        return;
+      }
+    }
+    
     // Checks whether any stored tag IS or IS A CHILD OF the tag identified by parentHash.
     // A stored tag T is a child of parentHash if parentHash appears in T's ancestor list.
     private bool HasByHash(long parentHash)

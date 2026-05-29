@@ -60,6 +60,75 @@ namespace com.karabaev.gameplayTags.tests
     }
 
     [Test]
+    public void RemoveContainer_RemovesPresentTags()
+    {
+      var c = MakeContainer();
+      c.Add(MakeTag("Damage.Fire"));
+      c.Add(MakeTag("Ability.Heal"));
+      c.Add(MakeTag("Status.Burn"));
+
+      var toRemove = MakeContainer();
+      toRemove.Add(MakeTag("Damage.Fire"));
+      toRemove.Add(MakeTag("Ability.Heal"));
+
+      c.Remove(toRemove);
+
+      Assert.AreEqual(1, c.Count);
+      Assert.IsFalse(c.HasExact(MakeTag("Damage.Fire")));
+      Assert.IsFalse(c.HasExact(MakeTag("Ability.Heal")));
+      Assert.IsTrue(c.HasExact(MakeTag("Status.Burn")));
+    }
+
+    [Test]
+    public void RemoveContainer_AbsentTags_AreIgnored()
+    {
+      var c = MakeContainer();
+      c.Add(MakeTag("Damage.Fire"));
+
+      var toRemove = MakeContainer();
+      toRemove.Add(MakeTag("Ability.Heal")); // not in c
+
+      Assert.DoesNotThrow(() => c.Remove(toRemove));
+      Assert.AreEqual(1, c.Count);
+      Assert.IsTrue(c.HasExact(MakeTag("Damage.Fire")));
+    }
+
+    [Test]
+    public void ToArray_ReturnsAllTags()
+    {
+      var c = MakeContainer();
+      var fire = MakeTag("Damage.Fire");
+      var heal = MakeTag("Ability.Heal");
+      c.Add(fire);
+      c.Add(heal);
+
+      var result = c.ToArray();
+
+      Assert.AreEqual(2, result.Length);
+      Assert.IsTrue(System.Array.Exists(result, t => t == fire));
+      Assert.IsTrue(System.Array.Exists(result, t => t == heal));
+    }
+
+    [Test]
+    public void ToArray_EmptyContainer_ReturnsEmptyArray()
+    {
+      var c = MakeContainer();
+      Assert.AreEqual(0, c.ToArray().Length);
+    }
+
+    [Test]
+    public void ToArray_TagsPreserveHierarchy()
+    {
+      var c = MakeContainer();
+      c.Add(MakeTag("Damage.Fire.Burning"));
+
+      var tag = c.ToArray()[0];
+
+      Assert.IsTrue(tag.IsChildOf(MakeTag("Damage.Fire")));
+      Assert.IsTrue(tag.IsChildOf(MakeTag("Damage")));
+    }
+
+    [Test]
     public void HasExact_PresentTag_ReturnsTrue()
     {
       var c = MakeContainer();

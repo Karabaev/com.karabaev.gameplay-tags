@@ -18,6 +18,8 @@ namespace com.karabaev.gameplayTags
       Depth = depth;
     }
 
+    internal static Tag FromRaw(long value, long* ancestors, int depth) => new Tag(value, ancestors, depth);
+
     /// <summary>
     /// Creates a Tag from a dot-separated hierarchical path (e.g. "Damage.Fire.Burning").
     /// Ancestor hashes are written into <paramref name="ancestors"/> (caller-owned buffer,
