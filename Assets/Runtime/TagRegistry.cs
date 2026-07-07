@@ -15,10 +15,21 @@ namespace com.karabaev.gameplayTags
   public class TagRegistry : IDisposable
   {
     private readonly Dictionary<long, string> _namesByHash = new();
+    private readonly Dictionary<string, Tag> _tagsByName = new();
     private readonly List<GCHandle> _handles = new();
     private readonly Dictionary<uint, ContainerHandles> _containerHandles = new();
-    private int _maxDepth;
+    private readonly int _maxDepth;
     private uint _nextContainerId = 1;
+
+    /// <summary>
+    /// Creates a registry whose containers and tags are limited to <paramref name="maxDepth"/>
+    /// levels of hierarchy. Registering a tag deeper than this throws.
+    /// </summary>
+    public TagRegistry(int maxDepth)
+    {
+      if (maxDepth < 0) throw new ArgumentOutOfRangeException(nameof(maxDepth), "Max depth cannot be negative.");
+      _maxDepth = maxDepth;
+    }
 
     /// <summary>
     /// Registers a full dot-separated name and all its implicit ancestor names.
@@ -29,7 +40,10 @@ namespace com.karabaev.gameplayTags
       if(string.IsNullOrEmpty(tagName)) throw new InvalidOperationException("Tag name cannot be null or empty");
 
       var tag = CreateTag(tagName);
-      _namesByHash.TryAdd(tag.Value, tagName);
+      if (_namesByHash.TryAdd(tag.Value, tagName))
+      {
+        _tagsByName[tagName] = tag;
+      }
 
       var remaining = tagName.AsSpan();
       var dotIndex = remaining.LastIndexOf(Tag.Separator);
@@ -37,7 +51,11 @@ namespace com.karabaev.gameplayTags
       {
         remaining = remaining[..dotIndex];
         var ancestorPath = remaining.ToString();
-        _namesByHash.TryAdd(CreateTag(ancestorPath).Value, ancestorPath);
+        var ancestorTag = CreateTag(ancestorPath);
+        if (_namesByHash.TryAdd(ancestorTag.Value, ancestorPath))
+        {
+          _tagsByName[ancestorPath] = ancestorTag;
+        }
         dotIndex = remaining.LastIndexOf(Tag.Separator);
       }
 
@@ -45,9 +63,14 @@ namespace com.karabaev.gameplayTags
     }
 
     /// <summary>
+    /// Looks up a previously registered tag by its full name without registering it.
+    /// Returns false if <paramref name="tagName"/> is not known to this registry.
+    /// </summary>
+    public bool TryGetTag(string tagName, out Tag tag) => _tagsByName.TryGetValue(tagName, out tag);
+
+    /// <summary>
     /// Allocates backing buffers for a TagContainer of the given capacity and returns it.
-    /// The ancestor stride is sized to the deepest tag registered so far.
-    /// Register all tags before creating containers that will hold them.
+    /// The ancestor stride equals the max depth this registry was constructed with.
     /// The buffers are owned by this registry and freed on <see cref="Dispose"/>.
     /// </summary>
     public unsafe TagContainer CreateContainer(int capacity)
@@ -106,8 +129,13 @@ namespace com.karabaev.gameplayTags
     private unsafe Tag CreateTag(string name)
     {
       var depth = CountSeparators(name);
-      if (depth > _maxDepth) _maxDepth = depth;
-      
+      if (depth > _maxDepth)
+      {
+        throw new InvalidOperationException(
+          $"Tag '{name}' has depth {depth}, which exceeds the configured max depth of {_maxDepth}. " +
+          "Increase Max Tag Depth in Project Settings > Gameplay > Tags.");
+      }
+
       long* ancestors = null;
       if (depth > 0)
       {

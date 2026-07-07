@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using com.karabaev.gameplayTags.editor.Baking;
 using UnityEditor;
 using UnityEngine;
 
@@ -14,9 +15,9 @@ namespace com.karabaev.gameplayTags.editor
     public void AddTag(string path, string comment = "")
     {
       if(ContainsPath(path)) return;
-      
+
       _tags.Add(new EditorTag(path, comment));
-      Save(true);
+      PersistAndRegenerate();
     }
 
     /// <summary>Removes the tag and all its descendants.</summary>
@@ -24,7 +25,7 @@ namespace com.karabaev.gameplayTags.editor
     {
       var childPrefix = path + Tag.Separator;
       _tags.RemoveAll(t => t.Name == path || t.Name.StartsWith(childPrefix));
-      Save(true);
+      PersistAndRegenerate();
     }
 
     /// <summary>
@@ -53,7 +54,7 @@ namespace com.karabaev.gameplayTags.editor
         }
       }
 
-      Save(true);
+      PersistAndRegenerate();
     }
 
     public bool ContainsPath(string tagName)
@@ -93,12 +94,12 @@ namespace com.karabaev.gameplayTags.editor
       var tag = FindTag(path);
       if(tag == null) return;
       tag.Comment = comment;
-      Save(true);
+      PersistAndRegenerate();
     }
 
     public TagRegistry BuildRegistry()
     {
-      var registry = new TagRegistry();
+      var registry = new TagRegistry(ListBaker.ComputeMaxDepth(_tags));
       foreach(var tag in _tags)
       {
         if (!string.IsNullOrEmpty(tag.Name))
@@ -107,6 +108,12 @@ namespace com.karabaev.gameplayTags.editor
         }
       }
       return registry;
+    }
+
+    private void PersistAndRegenerate()
+    {
+      Save(true);
+      ListBaker.Bake(_tags);
     }
   }
 }

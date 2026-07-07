@@ -105,8 +105,8 @@ namespace com.karabaev.gameplayTags.tests
       var result = c.ToArray();
 
       Assert.AreEqual(2, result.Length);
-      Assert.IsTrue(System.Array.Exists(result, t => t == fire));
-      Assert.IsTrue(System.Array.Exists(result, t => t == heal));
+      Assert.IsTrue(Array.Exists(result, t => t == fire));
+      Assert.IsTrue(Array.Exists(result, t => t == heal));
     }
 
     [Test]

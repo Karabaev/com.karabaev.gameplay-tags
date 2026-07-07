@@ -1,6 +1,8 @@
 using System;
+using com.karabaev.gameplayTags.editor.Baking;
 using com.karabaev.gameplayTags.editor.Usage;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -30,6 +32,8 @@ namespace com.karabaev.gameplayTags.editor
       title.style.marginBottom = 8;
       root.Add(title);
 
+      root.Add(BuildSettingsSection());
+
       var addRootBtn = new Button { text = "+  Add Root Tag" };
       addRootBtn.style.alignSelf = Align.FlexStart;
       addRootBtn.style.marginBottom = 6;
@@ -56,6 +60,84 @@ namespace com.karabaev.gameplayTags.editor
 
       addRootBtn.clicked += () => ShowAddForm("", rootFormContainer, db, Rebuild);
       Rebuild();
+    }
+
+    private static VisualElement BuildSettingsSection()
+    {
+      var settings = TagSettings.instance;
+
+      var box = new VisualElement();
+      box.style.marginBottom = 10;
+
+      var dirField = new ObjectField("Generated Code Directory")
+      {
+        objectType = typeof(DefaultAsset),
+        allowSceneObjects = false,
+        value = settings.GeneratedCodeDirectory
+      };
+
+      var dirError = CreateErrorLabel();
+
+      dirField.RegisterValueChangedCallback(evt =>
+      {
+        var asset = evt.newValue as DefaultAsset;
+        if (asset != null && !AssetDatabase.IsValidFolder(AssetDatabase.GetAssetPath(asset)))
+        {
+          SetError(dirError, "Selected asset is not a folder.");
+          dirField.SetValueWithoutNotify(evt.previousValue);
+          return;
+        }
+
+        dirError.style.display = DisplayStyle.None;
+        Undo.RecordObject(settings, "Set Gameplay Tags Generated Code Directory");
+        settings.SetGeneratedCodeDirectory(asset!);
+        ListBaker.Bake(TagDatabase.instance.Tags);
+      });
+
+      box.Add(dirField);
+      box.Add(dirError);
+
+      var namespaceField = new TextField("Generated Namespace") { value = settings.GeneratedNamespace };
+      var namespaceError = CreateErrorLabel();
+      namespaceField.RegisterValueChangedCallback(evt =>
+      {
+        var value = evt.newValue.Trim();
+        if (string.IsNullOrEmpty(value))
+        {
+          SetError(namespaceError, "Namespace must not be empty.");
+          namespaceField.SetValueWithoutNotify(evt.previousValue);
+          return;
+        }
+
+        namespaceError.style.display = DisplayStyle.None;
+        Undo.RecordObject(settings, "Set Gameplay Tags Generated Namespace");
+        settings.SetGeneratedNamespace(value);
+        ListBaker.Bake(TagDatabase.instance.Tags);
+      });
+      box.Add(namespaceField);
+      box.Add(namespaceError);
+
+      var classNameField = new TextField("Generated Class Name") { value = settings.GeneratedClassName };
+      var classNameError = CreateErrorLabel();
+      classNameField.RegisterValueChangedCallback(evt =>
+      {
+        var value = evt.newValue.Trim();
+        if (string.IsNullOrEmpty(value))
+        {
+          SetError(classNameError, "Class name must not be empty.");
+          classNameField.SetValueWithoutNotify(evt.previousValue);
+          return;
+        }
+
+        classNameError.style.display = DisplayStyle.None;
+        Undo.RecordObject(settings, "Set Gameplay Tags Generated Class Name");
+        settings.SetGeneratedClassName(value);
+        ListBaker.Bake(TagDatabase.instance.Tags);
+      });
+      box.Add(classNameField);
+      box.Add(classNameError);
+
+      return box;
     }
 
     private static VisualElement BuildNodeElement(TagTreeBuilder.TagNode node, TagDatabase db, Action rebuild)
@@ -119,6 +201,19 @@ namespace com.karabaev.gameplayTags.editor
         StyleIconButton(editButton);
         editButton.clicked += () => ShowEditForm(node, formContainer, db, rebuild);
         header.Add(editButton);
+
+        var copyButton = new Button { tooltip = "Copy full tag name" };
+        StyleIconButton(copyButton);
+        var copyIconContent = EditorGUIUtility.IconContent("Clipboard");
+        if(copyIconContent?.image != null)
+        {
+          var img = new Image { image = copyIconContent.image, scaleMode = ScaleMode.ScaleToFit };
+          img.style.width = 14;
+          img.style.height = 14;
+          copyButton.Add(img);
+        }
+        copyButton.clicked += () => EditorGUIUtility.systemCopyBuffer = node.FullPath;
+        header.Add(copyButton);
 
         var findButton = new Button { tooltip = "Find usages in assets" };
         StyleIconButton(findButton);
